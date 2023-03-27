@@ -3,6 +3,9 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.function.Consumer;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  *
@@ -46,17 +49,59 @@ public class OnlineCoursesAnalyzer {
 
     //1
     public Map<String, Integer> getPtcpCountByInst() {
-        return null;
+        return courses.stream()
+                .collect(Collectors.toMap(course -> course.institution, course -> course.participants, Integer::sum));
     }
 
     //2
     public Map<String, Integer> getPtcpCountByInstAndSubject() {
-        return null;
+        Map<String, Integer> result = new LinkedHashMap<>();
+        courses.stream()
+                .collect(Collectors.toMap(course -> course.institution + " " + course.subject,
+                        course -> course.participants, Integer::sum))
+                .entrySet().stream()
+                .sorted((e1, e2) -> e1.getValue().equals(e2.getValue())?
+                        e1.getKey().compareTo(e2.getKey()) : e2.getValue().compareTo(e1.getValue()))
+                .forEach(entry -> result.put(entry.getKey(), entry.getValue()));
+        return result;
     }
 
     //3
     public Map<String, List<List<String>>> getCourseListOfInstructor() {
-        return null;
+        Map<String, List<List<String>>> result = new HashMap<>();
+        courses.stream()
+                .forEach(course -> {
+                    String[] instructors = course.instructors.split(", ");
+                    if (instructors.length == 1) {
+                        if (!result.containsKey(instructors[0])) {
+                            List<List<String>> list = new ArrayList<>();
+                            list.add(new ArrayList<>());
+                            list.add(new ArrayList<>());
+                            result.put(instructors[0], list);
+                        }
+                        List<List<String>> list = result.get(instructors[0]);
+                        list.get(0).add(course.title);  // 是否会有重复？
+                        //result.put(instructors[0], list);  //
+                    }
+                    else {
+                        for (String instructor : instructors) {
+                            if (!result.containsKey(instructor)) {
+                                List<List<String>> list = new ArrayList<>();
+                                list.add(new ArrayList<>());
+                                list.add(new ArrayList<>());
+                                result.put(instructor, list);
+                            }
+                            List<List<String>> list = result.get(instructor);
+                            list.get(1).add(course.title);  // 是否会有重复？
+                            //result.put(instructors[0], list);  //
+                        }
+                    }
+                });
+        result.entrySet().stream().forEach(entry -> {
+            Collections.sort(entry.getValue().get(0));
+            Collections.sort(entry.getValue().get(1));
+        });
+        return result;
     }
 
     //4
