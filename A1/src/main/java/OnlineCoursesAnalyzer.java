@@ -57,7 +57,7 @@ public class OnlineCoursesAnalyzer {
     public Map<String, Integer> getPtcpCountByInstAndSubject() {
         Map<String, Integer> result = new LinkedHashMap<>();
         courses.stream()
-                .collect(Collectors.toMap(course -> course.institution + " " + course.subject,
+                .collect(Collectors.toMap(course -> course.institution + "-" + course.subject,
                         course -> course.participants, Integer::sum))
                 .entrySet().stream()
                 .sorted((e1, e2) -> e1.getValue().equals(e2.getValue())?
@@ -69,6 +69,7 @@ public class OnlineCoursesAnalyzer {
     //3
     public Map<String, List<List<String>>> getCourseListOfInstructor() {
         Map<String, List<List<String>>> result = new HashMap<>();
+        Map<String, List<List<String>>> result2 = new HashMap<>();
         courses.stream()
                 .forEach(course -> {
                     String[] instructors = course.instructors.split(", ");
@@ -80,7 +81,8 @@ public class OnlineCoursesAnalyzer {
                             result.put(instructors[0], list);
                         }
                         List<List<String>> list = result.get(instructors[0]);
-                        list.get(0).add(course.title);  // 是否会有重复？
+                        if (!list.get(0).contains(course.title))
+                            list.get(0).add(course.title);  // redundant?
                         //result.put(instructors[0], list);  //
                     }
                     else {
@@ -92,7 +94,8 @@ public class OnlineCoursesAnalyzer {
                                 result.put(instructor, list);
                             }
                             List<List<String>> list = result.get(instructor);
-                            list.get(1).add(course.title);  // 是否会有重复？
+                            if (!list.get(1).contains(course.title))
+                                list.get(1).add(course.title);  // redundant?
                             //result.put(instructors[0], list);  //
                         }
                     }
@@ -106,17 +109,74 @@ public class OnlineCoursesAnalyzer {
 
     //4
     public List<String> getCourses(int topK, String by) {
-        return null;
+        if (by.equals("hours")) {
+            return courses.stream()
+                    .sorted((c1, c2) -> c1.totalHours == c2.totalHours?
+                            c1.title.compareTo(c2.title) : Double.compare(c2.totalHours, c1.totalHours))
+                    .map(course -> course.title)
+                    .distinct()
+                    .limit(topK)
+                    .toList();
+        }
+        else {
+            return courses.stream()
+                    .sorted((c1, c2) -> c1.participants == c2.participants?
+                            c1.title.compareTo(c2.title) : Integer.compare(c2.participants, c1.participants))
+                    .map(course -> course.title)
+                    .distinct()
+                    .limit(topK)
+                    .toList();
+        }
     }
 
     //5
     public List<String> searchCourses(String courseSubject, double percentAudited, double totalCourseHours) {
-        return null;
+        return courses.stream()
+                .filter(course -> course.subject.toUpperCase().contains(courseSubject.toUpperCase()) &&
+                        course.percentAudited >= percentAudited &&
+                        course.totalHours <= totalCourseHours)
+                .map(course -> course.title)
+                .distinct()
+                .sorted()
+                .toList();
     }
 
     //6
     public List<String> recommendCourses(int age, int gender, int isBachelorOrHigher) {
-        return null;
+        Map<String, Double> ageMap = courses.stream()
+                .collect(Collectors.groupingBy(course -> course.number,
+                        Collectors.averagingDouble(course -> course.medianAge)));
+        Map<String, Double> genderMap = courses.stream()
+                .collect(Collectors.groupingBy(course -> course.number,
+                        Collectors.averagingDouble(course -> course.percentMale)));
+        Map<String, Double> degreeMap = courses.stream()
+                .collect(Collectors.groupingBy(course -> course.number,
+                        Collectors.averagingDouble(course -> course.percentDegree)));
+        return courses.stream()
+                .collect(Collectors.groupingBy(course -> course.number,
+                        Collectors.maxBy(Comparator.comparing(c -> c.launchDate))))
+                .entrySet().stream()
+                .sorted((e1, e2) ->
+                        Double.compare(
+                            Math.pow(age - ageMap.get(e1.getKey()), 2) +
+                            Math.pow(gender * 100 - genderMap.get(e1.getKey()), 2) +
+                            Math.pow(isBachelorOrHigher * 100 - degreeMap.get(e1.getKey()), 2),
+                            Math.pow(age - ageMap.get(e2.getKey()), 2) +
+                            Math.pow(gender * 100 - genderMap.get(e2.getKey()), 2) +
+                            Math.pow(isBachelorOrHigher * 100 - degreeMap.get(e2.getKey()), 2)) == 0?
+                        e1.getValue().get().title.compareTo(e2.getValue().get().title) :
+                        Double.compare(
+                            Math.pow(age - ageMap.get(e1.getKey()), 2) +
+                            Math.pow(gender * 100 - genderMap.get(e1.getKey()), 2) +
+                            Math.pow(isBachelorOrHigher * 100 - degreeMap.get(e1.getKey()), 2),
+                            Math.pow(age - ageMap.get(e2.getKey()), 2) +
+                            Math.pow(gender * 100 - genderMap.get(e2.getKey()), 2) +
+                            Math.pow(isBachelorOrHigher * 100 - degreeMap.get(e2.getKey()), 2))
+                )
+                .map(e -> e.getValue().get().title)
+                .distinct()
+                .limit(10)
+                .toList();
     }
 
 }
